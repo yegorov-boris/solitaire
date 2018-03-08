@@ -1,10 +1,10 @@
 module Lib
-    ( encode
+    ( processMessage
     ) where
 
 import System.Random (mkStdGen)
 import System.Random.Shuffle (shuffle')
-import Data.List (takeWhile, dropWhile, elemIndex, last)
+import Data.List (takeWhile, dropWhile, elemIndex, last, zipWith)
 import Data.Maybe (fromJust)
 
 data Suit = Club | Diamond | Heart | Spade deriving (Eq, Show)
@@ -20,24 +20,30 @@ deck = JokerA:JokerB:[NormalCard suit rank | suit <- suits, rank <- ranks]
 deckLength = length deck
 shuffledDeck = shuffle' deck deckLength $ mkStdGen deckLength
 
-encode :: String -> Char
-encode message = getKeyLetter shuffledDeck
-
-getKeyLetter :: Hand -> Char
-getKeyLetter deck =
+processMessage :: (Int -> Int -> Int) -> String -> String
+processMessage f message =
   let
-    currentDeck = nextState deck
-    card = currentDeck !! (value $ head currentDeck)
+    key = generateKey (length message) shuffledDeck ""
   in
-    if
-      (card == JokerA) || (card == JokerB)
-    then
-      getKeyLetter currentDeck
-    else
-      letters !! ((value card) `mod` 26)
+    zipWith (calcLetters f) message key
 
-nextState :: Hand -> Hand
-nextState = switchByLast . switchTopBottom . moveJokerB . moveJokerA
+generateKey :: Int -> Hand -> String -> String
+generateKey len previousDeck previousKey
+  | (length previousKey) == len = previousKey
+  | otherwise =
+    let
+      currentDeck = nextDeck previousDeck
+      card = currentDeck !! (value $ head currentDeck)
+    in
+      if
+        (card == JokerA) || (card == JokerB)
+      then
+        generateKey len currentDeck previousKey
+      else
+        generateKey len currentDeck ((letters !! ((value card) `mod` 26)):previousKey)
+
+nextDeck :: Hand -> Hand
+nextDeck = switchByLast . switchTopBottom . moveJokerB . moveJokerA
 
 moveJokerA :: Hand -> Hand
 moveJokerA deck =
@@ -66,8 +72,8 @@ moveJokerB deck =
 switchTopBottom :: Hand -> Hand
 switchTopBottom deck =
   let
-    indexA = fromJust $ elemIndex JokerA deck
-    indexB = fromJust $ elemIndex JokerB deck
+    indexA = findIndex JokerA deck
+    indexB = findIndex JokerB deck
     indexMin = min indexA indexB
     indexMax = max indexA indexB
     top = take indexMin deck
@@ -94,3 +100,14 @@ value (NormalCard Club rank) = rank
 value (NormalCard Diamond rank) = rank + 13
 value (NormalCard Heart rank) = rank + 26
 value (NormalCard Spade rank) = rank + 39
+
+calcLetters :: (Int -> Int -> Int) -> Char -> Char -> Char
+calcLetters f a b =
+  let
+    indexA = findIndex a letters
+    indexB = findIndex b letters
+  in
+    letters !! ((f indexA indexB) `mod` 26)
+
+findIndex :: Eq a => a -> [a] -> Int
+findIndex x xs = fromJust $ elemIndex x xs
