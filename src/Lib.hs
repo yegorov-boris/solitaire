@@ -1,11 +1,14 @@
 module Lib
-    ( processMessage
+    ( mapMessage
+    , generateKey
+    , prepare
     ) where
 
 import System.Random (mkStdGen)
 import System.Random.Shuffle (shuffle')
-import Data.List (takeWhile, dropWhile, elemIndex, last, zipWith)
+import Data.List (takeWhile, dropWhile, elemIndex, last, zipWith, elem)
 import Data.Maybe (fromJust)
+import Data.Char (toLower)
 
 data Suit = Club | Diamond | Heart | Spade deriving (Eq, Show)
 
@@ -20,15 +23,14 @@ deck = JokerA:JokerB:[NormalCard suit rank | suit <- suits, rank <- ranks]
 deckLength = length deck
 shuffledDeck = shuffle' deck deckLength $ mkStdGen deckLength
 
-processMessage :: (Int -> Int -> Int) -> String -> String
-processMessage f message =
-  let
-    key = generateKey (length message) shuffledDeck ""
-  in
-    zipWith (calcLetters f) message key
+mapMessage :: (Int -> Int -> Int) -> String -> String -> String
+mapMessage f message key = zipWith (calcLetters f) message key
 
-generateKey :: Int -> Hand -> String -> String
-generateKey len previousDeck previousKey
+generateKey :: String -> String
+generateKey message = generateKey' (length message) shuffledDeck ""
+
+generateKey' :: Int -> Hand -> String -> String
+generateKey' len previousDeck previousKey
   | (length previousKey) == len = previousKey
   | otherwise =
     let
@@ -38,9 +40,9 @@ generateKey len previousDeck previousKey
       if
         (card == JokerA) || (card == JokerB)
       then
-        generateKey len currentDeck previousKey
+        generateKey' len currentDeck previousKey
       else
-        generateKey len currentDeck ((letters !! ((value card) `mod` 26)):previousKey)
+        generateKey' len currentDeck ((letters !! ((value card) `mod` 26)):previousKey)
 
 nextDeck :: Hand -> Hand
 nextDeck = switchByLast . switchTopBottom . moveJokerB . moveJokerA
@@ -111,3 +113,6 @@ calcLetters f a b =
 
 findIndex :: Eq a => a -> [a] -> Int
 findIndex x xs = fromJust $ elemIndex x xs
+
+prepare :: String -> String
+prepare = (map toLower) . (filter (`elem` letters))
